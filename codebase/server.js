@@ -9,7 +9,7 @@ const app = express();
 //server port
 const port = 3000;
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*' } });
+const io = new Server(server, { cors: { origin: "*" } });
 
 app.use(express.json());
 
@@ -68,11 +68,10 @@ app.post("/api/command", (req, res) => {
   });
 });
 
-
 // ZIEGLERS NICHOLS TUNING METHOD
 let doZiegler = false;
 let currentKp = 0;
-const MOVEMENT_THRESHOLD = 5.0;  // Arm must move 5° from start to count
+const MOVEMENT_THRESHOLD = 5.0; // Arm must move 5° from start to count
 const OSCILLATION_MIN_AMP = 2.0; // Swings must be > 2° to be a real oscillation
 let lastValue = null;
 let isRising = null;
@@ -173,7 +172,7 @@ function processZiegler(actualValue, timestamp) {
         // We just hit a PEAK (top of the swing)
         peaks.push({ value: lastValue, time: timestamp });
         if (peaks.length > 5) peaks.shift();
-        
+
         console.log(`Peak detected: ${lastValue} at Kp: ${currentKp}`);
         checkForSustainedOscillation();
       }
@@ -189,13 +188,14 @@ function checkForSustainedOscillation() {
   const lastPeak = peaks[peaks.length - 1].value;
   const prevPeak = peaks[peaks.length - 2].value;
   const lastTrough = troughs[troughs.length - 1].value;
-  
+
   const amplitude = Math.abs(lastPeak - lastTrough);
   const peakVariation = Math.abs(lastPeak - prevPeak);
 
   // If amplitude is healthy and peaks are staying at a similar height (within 10%)
-  if (amplitude > OSCILLATION_MIN_AMP && (peakVariation / amplitude) < 0.1) {
-    const Tu = (peaks[peaks.length - 1].time - peaks[peaks.length - 2].time) / 1000; 
+  if (amplitude > OSCILLATION_MIN_AMP && peakVariation / amplitude < 0.1) {
+    const Tu =
+      (peaks[peaks.length - 1].time - peaks[peaks.length - 2].time) / 1000;
     const Ku = currentKp;
 
     // Classic Ziegler-Nichols Formulas
@@ -203,14 +203,13 @@ function checkForSustainedOscillation() {
     // const finalKi = 1.2 * (finalKp / Tu);
     // const finalKd = (finalKp * Tu) / 8;
 
-
-/**
- * ZIEGLER-NICHOLS GAIN CALCULATIONS (Table 2)
- * Note: These formulas convert Time Constants (Ti, Td) into Controller Gains (Ki, Kd).
- * We use the Parallel Form of the PID equation as required by the ESP32 firmware.
- */
+    /**
+     * ZIEGLER-NICHOLS GAIN CALCULATIONS (Table 2)
+     * Note: These formulas convert Time Constants (Ti, Td) into Controller Gains (Ki, Kd).
+     * We use the Parallel Form of the PID equation as required by the ESP32 firmware.
+     */
     // Kp = 0.60 * Ku
-    const finalKp = parseFloat((0.60 * Ku).toFixed(3));
+    const finalKp = parseFloat((0.6 * Ku).toFixed(3));
     // Ki = (Kp / Ti) -> (0.60 * Ku) / (0.5 * Tu) = 1.2 * Ku / Tu
     const finalKi = parseFloat(((1.2 * Ku) / Tu).toFixed(3));
     // Kd = (Kp * Td) -> (0.60 * Ku) * (0.125 * Tu) = 0.075 * Ku * Tu = 3/40 * Ku * Tu
@@ -221,14 +220,14 @@ function checkForSustainedOscillation() {
 
     doZiegler = false; // Stop the loop
     if (znClient) {
-      znClient.emit('zn-finished', { 
-      kp: finalKp, 
-      ki: finalKi, 
-      kd: finalKd, 
-      Ku: parseFloat(Ku.toFixed(3)), 
-      Tu: parseFloat(Tu.toFixed(3)) 
-  });
-}
+      znClient.emit("zn-finished", {
+        kp: finalKp,
+        ki: finalKi,
+        kd: finalKd,
+        Ku: parseFloat(Ku.toFixed(3)),
+        Tu: parseFloat(Tu.toFixed(3)),
+      });
+    }
   }
 }
 
@@ -263,21 +262,18 @@ mqttClient.on("message", (topic, message) => {
       if (doZiegler) {
         processZiegler(data.actualValue, data.timestamp);
       }
-
     }
   } catch (error) {
     console.error("Received message was not valid JSON", error);
   }
 });
 
-
-
-io.on('connection', (socket) => {
-  console.log('Frontend connected:', socket.id);
+io.on("connection", (socket) => {
+  console.log("Frontend connected:", socket.id);
   znClient = socket;
 
-  socket.on('start-zn', async (data) => {
-    console.log('Starting ZN sequence...');
+  socket.on("start-zn", async (data) => {
+    console.log("Starting ZN sequence...");
     console.log(`Setpoint: ${data.setpoint}`);
     doZiegler = true;
     currentKp = 0.1; // Start low
@@ -290,26 +286,23 @@ io.on('connection', (socket) => {
       await sendKpToEsp32(currentKp, 0, 0, setpoint);
       io.emit("kp-climb", { currentKp: currentKp.toFixed(2) });
       console.log(`Testing Kp: ${currentKp.toFixed(2)}`);
-      
-      // WAIT: 2 seconds gives the propeller time to spin up and move
-      await new Promise(r => setTimeout(r, 2000)); 
-      
-      if (doZiegler) {
-            currentKp += 0.2; // kp step size
-      } else {
-            console.log("Loop terminated: Oscillation detected.");
-      } 
 
-      
+      // WAIT: 2 seconds gives the propeller time to spin up and move
+      await new Promise((r) => setTimeout(r, 5000));
+
+      if (doZiegler) {
+        currentKp += 0.05; // kp step size
+      } else {
+        console.log("Loop terminated: Oscillation detected.");
+      }
     }
   });
 
-  socket.on('disconnect', () => {
-    console.log('Frontend disconnected:', socket.id);
+  socket.on("disconnect", () => {
+    console.log("Frontend disconnected:", socket.id);
     znClient = null;
   });
 });
-
 
 //serve static files
 app.use(express.static(path.join(__dirname, "frontend")));
