@@ -38,7 +38,11 @@ const pidChart = new Chart(ctx, {
     responsive: true,
     maintainAspectRatio: false,
     scales: {
-      y: { beginAtZero: true },
+      y: {
+        beginAtZero: true,
+        suggestedMax: 180, // Force the scale to stay consistent
+        suggestedMin: 0,
+      },
       x: { display: false }, // Hide x-axis labels for a cleaner look
     },
   },
@@ -46,6 +50,10 @@ const pidChart = new Chart(ctx, {
 
 // Listen for the "realtimeData" event we created in the server
 socket.on("realtimeData", (data) => {
+  if (isNaN(data.actualValue) || isNaN(data.setpoint)) {
+    console.warn("Invalid data received, skipping update.");
+    return;
+  }
   console.log("New data received:", data);
 
   // Update your HTML elements dynamically
